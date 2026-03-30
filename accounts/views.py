@@ -2,6 +2,10 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import user_passes_test
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 
 # 👤 USER LOGIN
@@ -68,3 +72,32 @@ def dashboard(request):
     if request.user.is_superuser:
         return redirect('admin_dashboard')
     return render(request, 'accounts/user_dashboard.html')
+
+
+@api_view(['POST'])
+def jwt_login(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    user = authenticate(username=username, password=password)
+
+    if user is not None:
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'role': 'admin' if user.is_superuser else 'user'
+        })
+    
+    return Response({'error': 'Invalid credentials'}, status=400)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def protected_view(request):
+    return Response({
+        'message': f'Hello {request.user.username}',
+        'role': 'admin' if request.user.is_superuser else 'user'
+    })
+
+    
